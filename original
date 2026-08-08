@@ -8,33 +8,50 @@ from typing import Dict, List
 # PAGE CONFIG
 # ────────────────────────────────────────────────
 st.set_page_config(
-    page_title="ERaise | Dual Role Trade-in Platform",
+    page_title="ERaise | Dual Role + Refurbished Store",
     page_icon="💰",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
 # ────────────────────────────────────────────────
-# SESSION STATE INITIALIZATION
+# SESSION STATE
 # ────────────────────────────────────────────────
 defaults = {
-    "role": None,                    # "customer" or "delivery"
+    "role": None,
     "logged_in": False,
     "user_email": "",
     "user_name": "",
     "is_returning_user": False,
     "known_customers": set(),
     "cart": [],
-    "quote_history": [],             # All orders live here (shared)
+    "quote_history": [],                 # Trade-in orders
+    "refurbished_orders": [],            # Buy refurbished orders
     "current_step": 1,
     "selected_category": "Smartphones",
     "delivery_logged_in": False,
     "delivery_name": "",
+    "customer_view": "tradein",          # "tradein" or "refurbished"
 }
 
 for key, value in defaults.items():
     if key not in st.session_state:
         st.session_state[key] = value
+
+# Initialize refurbished inventory only once
+if "refurbished_inventory" not in st.session_state:
+    st.session_state.refurbished_inventory = [
+        {"id": "RF001", "category": "Smartphones", "model": "iPhone 14", "storage": "128 GB", "condition": "Excellent (Like New)", "price": 32000, "qty": 5},
+        {"id": "RF002", "category": "Smartphones", "model": "iPhone 13", "storage": "128 GB", "condition": "Good (Light wear)", "price": 24500, "qty": 8},
+        {"id": "RF003", "category": "Smartphones", "model": "Samsung Galaxy S23", "storage": "256 GB", "condition": "Excellent (Like New)", "price": 38000, "qty": 4},
+        {"id": "RF004", "category": "Smartphones", "model": "OnePlus 11", "storage": "256 GB", "condition": "Good (Light wear)", "price": 28000, "qty": 6},
+        {"id": "RF005", "category": "Tablets", "model": "iPad Air (M1)", "storage": "256 GB", "condition": "Excellent (Like New)", "price": 42000, "qty": 3},
+        {"id": "RF006", "category": "Laptops", "model": "MacBook Air M2", "storage": "256 GB", "condition": "Good (Light wear)", "price": 72000, "qty": 2},
+        {"id": "RF007", "category": "Smartwatches", "model": "Apple Watch Series 8", "storage": "45mm", "condition": "Excellent (Like New)", "price": 22000, "qty": 7},
+        {"id": "RF008", "category": "Audio", "model": "Sony WH-1000XM4", "storage": "N/A", "condition": "Good (Light wear)", "price": 14500, "qty": 5},
+        {"id": "RF009", "category": "Gaming", "model": "PlayStation 5 (Disc)", "storage": "825 GB", "condition": "Excellent (Like New)", "price": 38000, "qty": 3},
+        {"id": "RF010", "category": "Smartphones", "model": "Google Pixel 7", "storage": "128 GB", "condition": "Fair (Visible scuffs)", "price": 18500, "qty": 4},
+    ]
 
 # ────────────────────────────────────────────────
 # DATA
@@ -87,7 +104,7 @@ CURRENCIES = {
 }
 
 # ────────────────────────────────────────────────
-# CUSTOMER THEME (Colorful - Keep as is)
+# THEMES
 # ────────────────────────────────────────────────
 CUSTOMER_CSS = """
 <style>
@@ -111,18 +128,17 @@ CUSTOMER_CSS = """
     .stButton > button[kind="secondary"] {
         background: linear-gradient(90deg, #a5b4fc, #818cf8) !important; color: white !important; border: none !important;
     }
-    [data-testid="stMetric"] { background: linear-gradient(145deg, #ecfdf5, #f0fdfa); border: 1px solid #a7f3d0; border-radius: 16px; }
-    [data-testid="stMetricValue"] { color: #047857 !important; font-weight: 800 !important; }
-    .device-card {
+    .device-card, .refurb-card {
         background: linear-gradient(135deg, #fdf4ff, #f0f9ff); border: 1px solid #e9d5ff;
-        border-radius: 16px; padding: 16px 20px; margin-bottom: 12px;
+        border-radius: 16px; padding: 18px 22px; margin-bottom: 14px;
+    }
+    .folder-btn {
+        background: #f5f3ff; border: 2px solid #ddd6fe; border-radius: 16px;
+        padding: 18px; text-align: center; font-weight: 700; margin-bottom: 12px;
     }
 </style>
 """
 
-# ────────────────────────────────────────────────
-# DELIVERY THEME (Light Blue / Clean)
-# ────────────────────────────────────────────────
 DELIVERY_CSS = """
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
@@ -140,9 +156,6 @@ DELIVERY_CSS = """
     .stButton > button[kind="primary"] {
         background: linear-gradient(90deg, #0ea5e9, #0284c7) !important; color: white !important; border: none !important;
     }
-    .stButton > button[kind="secondary"] {
-        background: linear-gradient(90deg, #67e8f9, #22d3ee) !important; color: #0c4a6e !important; border: none !important;
-    }
     .order-card {
         background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 16px;
         padding: 18px 22px; margin-bottom: 14px;
@@ -151,7 +164,7 @@ DELIVERY_CSS = """
 """
 
 # ────────────────────────────────────────────────
-# ROLE SELECTION PAGE
+# ROLE SELECTION
 # ────────────────────────────────────────────────
 if st.session_state.role is None:
     st.markdown("""
@@ -164,7 +177,6 @@ if st.session_state.role is None:
 
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
-        st.markdown("### Select Interface")
         if st.button("👤  I am a Customer", use_container_width=True, type="primary"):
             st.session_state.role = "customer"
             st.rerun()
@@ -180,7 +192,7 @@ if st.session_state.role is None:
 if st.session_state.role == "customer":
     st.markdown(CUSTOMER_CSS, unsafe_allow_html=True)
 
-    # ----- Customer Login -----
+    # Customer Login
     if not st.session_state.logged_in:
         st.markdown("""
         <div class="eraise-header">
@@ -193,7 +205,6 @@ if st.session_state.role == "customer":
         st.markdown("### 🔐 Customer Login / Sign In")
         email = st.text_input("Email Address", placeholder="you@example.com")
         name = st.text_input("Full Name", placeholder="Rahul Sharma")
-
         if st.button("Continue", type="primary", use_container_width=True):
             if email and "@" in email and name.strip():
                 email = email.strip().lower()
@@ -208,13 +219,13 @@ if st.session_state.role == "customer":
         st.markdown('</div>', unsafe_allow_html=True)
         st.stop()
 
-    # ----- Customer Main App -----
+    # Header
     now = datetime.datetime.now().strftime("%A, %d %B %Y • %I:%M %p IST")
     st.markdown(f"""
     <div class="eraise-header">
         <div>
             <div class="eraise-logo">ERaise</div>
-            <div style="color:#fce7f3; font-size:1rem;">Customer Portal</div>
+            <div style="color:#fce7f3;">Customer Portal</div>
         </div>
         <div style="text-align:right; font-size:0.9rem;">
             👤 {st.session_state.user_name}<br>{st.session_state.user_email}<br>{now}
@@ -222,187 +233,253 @@ if st.session_state.role == "customer":
     </div>
     """, unsafe_allow_html=True)
 
-    if st.session_state.is_returning_user:
-        st.success(f"👋 Welcome back, **{st.session_state.user_name}**!")
-    else:
-        st.info(f"🎉 Welcome **{st.session_state.user_name}**! First time with ERaise.")
-
-    # Sidebar
-    with st.sidebar:
-        st.markdown("### 📱 Categories")
-        for cat in DEVICE_CATALOG.keys():
-            if st.button(cat, key=f"c_{cat}", use_container_width=True,
-                         type="primary" if st.session_state.selected_category == cat else "secondary"):
-                st.session_state.selected_category = cat
-                st.session_state.current_step = 2
-                st.rerun()
-
-        st.markdown("---")
-        selected_currency = st.selectbox("Currency", list(CURRENCIES.keys()))
-        curr_sym = CURRENCIES[selected_currency]["symbol"]
-        curr_rate = CURRENCIES[selected_currency]["rate"]
-
-        st.markdown("---")
+    # Top Navigation: Trade-in vs Refurbished
+    nav1, nav2, nav3 = st.columns([2, 2, 1])
+    with nav1:
+        if st.button("📤 Trade-in Your Device", use_container_width=True,
+                     type="primary" if st.session_state.customer_view == "tradein" else "secondary"):
+            st.session_state.customer_view = "tradein"
+            st.rerun()
+    with nav2:
+        if st.button("🛒 Buy Refurbished", use_container_width=True,
+                     type="primary" if st.session_state.customer_view == "refurbished" else "secondary"):
+            st.session_state.customer_view = "refurbished"
+            st.rerun()
+    with nav3:
         if st.button("🚪 Logout", use_container_width=True):
             st.session_state.logged_in = False
             st.session_state.role = None
             st.rerun()
 
-    # Steps
-    steps = {1: "1. Customer", 2: "2. Add Devices", 3: "3. Cart", 4: "4. Lock Quote"}
-    cols = st.columns(4)
-    for i, (num, label) in enumerate(steps.items()):
-        with cols[i]:
-            if st.button(label, key=f"s_{num}", use_container_width=True,
-                         type="primary" if st.session_state.current_step == num else "secondary"):
-                st.session_state.current_step = num
-                st.rerun()
-
-    # STEP 1
-    if st.session_state.current_step == 1:
+    # ─────────────── REFURBISHED STORE ───────────────
+    if st.session_state.customer_view == "refurbished":
         st.markdown('<div class="section-card">', unsafe_allow_html=True)
-        st.markdown("### 1. Customer & Pickup Details")
-        c1, c2 = st.columns(2)
-        with c1:
-            st.text_input("Full Name *", value=st.session_state.user_name, key="cust_name")
-            st.text_input("Email", value=st.session_state.user_email, key="cust_email")
-        with c2:
-            phone = st.text_input("Phone Number *", placeholder="+91 98765 43210", key="cust_phone")
-            st.date_input("Preferred Pickup Date", key="cust_date")
+        st.markdown("### 🛒 Refurbished Store")
+        st.caption("Browse by category (folder view) and buy quality refurbished devices")
 
-        address = st.text_area("Pickup Address *", height=80, key="cust_address")
+        # Folder-style category navigation
+        categories = sorted(list(set(item["category"] for item in st.session_state.refurbished_inventory)))
+        selected_folder = st.selectbox("📁 Select Category Folder", ["All"] + categories)
 
-        if st.button("Next → Add Devices", type="primary", use_container_width=True):
-            if st.session_state.get("cust_name") and st.session_state.get("cust_phone") and st.session_state.get("cust_address"):
-                st.session_state.current_step = 2
-                st.rerun()
-            else:
-                st.warning("Name, Phone Number and Address are mandatory")
-        st.markdown('</div>', unsafe_allow_html=True)
-
-    # STEP 2
-    elif st.session_state.current_step == 2:
-        st.markdown('<div class="section-card">', unsafe_allow_html=True)
-        st.markdown(f"### 2. Add Device • {st.session_state.selected_category}")
-
-        category = st.selectbox("Category", list(DEVICE_CATALOG.keys()),
-                                index=list(DEVICE_CATALOG.keys()).index(st.session_state.selected_category))
-        st.session_state.selected_category = category
-        model = st.selectbox("Model", sorted(DEVICE_CATALOG[category].keys()))
-
-        c1, c2, c3 = st.columns(3)
-        with c1:
-            storage = st.selectbox("Storage", list(STORAGE_PREMIUMS.keys()))
-        with c2:
-            condition = st.selectbox("Condition", list(CONDITION_MULTIPLIERS.keys()))
-        with c3:
-            carrier = st.selectbox("Network", list(CARRIER_MODIFIERS.keys()))
-
-        imei = st.text_input("IMEI / Serial *")
-        qty = st.number_input("Quantity", 1, 10, 1)
-
-        base = DEVICE_CATALOG[category][model]
-        raw = ((base + STORAGE_PREMIUMS[storage]) * CONDITION_MULTIPLIERS[condition]) + CARRIER_MODIFIERS[carrier]
-        unit_price = max(8.0, raw) * curr_rate
-        total_line = unit_price * qty
-
-        st.info(f"Estimate: **{curr_sym}{total_line:,.0f}**")
-
-        c1, c2 = st.columns(2)
-        with c1:
-            if st.button("➕ Add to Cart", type="secondary", use_container_width=True):
-                if imei.strip():
-                    st.session_state.cart.append({
-                        "category": category, "model": model, "storage": storage,
-                        "condition": condition, "carrier": carrier, "imei": imei,
-                        "qty": qty, "unit_price": unit_price, "line_total": total_line
-                    })
-                    st.success("Added!")
-                    st.rerun()
-                else:
-                    st.warning("Enter IMEI")
-        with c2:
-            if st.button("Next → Cart", type="primary", use_container_width=True):
-                st.session_state.current_step = 3
-                st.rerun()
-        st.markdown('</div>', unsafe_allow_html=True)
-
-    # STEP 3
-    elif st.session_state.current_step == 3:
-        st.markdown('<div class="section-card">', unsafe_allow_html=True)
-        st.markdown("### 3. Your Cart")
-        if not st.session_state.cart:
-            st.info("Cart empty")
+        # Filter items
+        if selected_folder == "All":
+            items = st.session_state.refurbished_inventory
         else:
-            total = sum(i["line_total"] for i in st.session_state.cart)
-            for idx, item in enumerate(st.session_state.cart):
-                col1, col2 = st.columns([5,1])
+            items = [i for i in st.session_state.refurbished_inventory if i["category"] == selected_folder]
+
+        if not items:
+            st.info("No items available in this folder.")
+        else:
+            for item in items:
+                if item["qty"] <= 0:
+                    continue
+                col1, col2, col3 = st.columns([3, 2, 1.5])
                 with col1:
                     st.markdown(f"""
-                    <div class="device-card">
-                        <b>{item['model']}</b> × {item['qty']}<br>
-                        <small>{item['condition']} • {item['imei']}</small><br>
-                        <span style="color:#047857; font-weight:800;">{curr_sym}{item['line_total']:,.0f}</span>
+                    <div class="refurb-card">
+                        <b>{item['model']}</b><br>
+                        <small>{item['category']} • {item['storage']} • {item['condition']}</small><br>
+                        <span style="color:#047857; font-weight:800; font-size:1.2rem;">₹{item['price']:,}</span>
+                        &nbsp; <small>({item['qty']} left)</small>
                     </div>
                     """, unsafe_allow_html=True)
                 with col2:
-                    if st.button("🗑️", key=f"d{idx}"):
-                        st.session_state.cart.pop(idx)
+                    buy_qty = st.number_input(f"Qty", 1, item["qty"], 1, key=f"bq_{item['id']}")
+                with col3:
+                    if st.button("Buy Now", key=f"buy_{item['id']}", type="primary"):
+                        # Create refurbished order
+                        order_id = f"RF-{random.randint(10000,99999)}"
+                        order = {
+                            "Order ID": order_id,
+                            "Timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),
+                            "Customer Name": st.session_state.user_name,
+                            "Email": st.session_state.user_email,
+                            "Phone": st.session_state.get("cust_phone", "Not provided"),
+                            "Item": f"{item['model']} ({item['storage']})",
+                            "Category": item["category"],
+                            "Condition": item["condition"],
+                            "Qty": buy_qty,
+                            "Total": item["price"] * buy_qty,
+                            "Status": "Pending Delivery",
+                            "Assigned To": ""
+                        }
+                        st.session_state.refurbished_orders.append(order)
+
+                        # Reduce stock
+                        for inv in st.session_state.refurbished_inventory:
+                            if inv["id"] == item["id"]:
+                                inv["qty"] -= buy_qty
+                                break
+
+                        st.success(f"✅ Order **{order_id}** placed! Total: ₹{item['price']*buy_qty:,}")
+                        st.balloons()
                         st.rerun()
-            st.markdown(f"### Total: **{curr_sym}{total:,.0f}**")
-            if st.button("Next → Lock Quote", type="primary", use_container_width=True):
-                st.session_state.current_step = 4
-                st.rerun()
+
         st.markdown('</div>', unsafe_allow_html=True)
 
-    # STEP 4
-    elif st.session_state.current_step == 4:
-        st.markdown('<div class="section-card">', unsafe_allow_html=True)
-        st.markdown("### 4. Lock Quote")
-        if st.session_state.cart and st.session_state.get("cust_phone"):
-            total = sum(i["line_total"] for i in st.session_state.cart)
-            st.metric("Total Payout", f"{curr_sym}{total:,.0f}")
+        # Customer's refurbished purchase history
+        my_refurb = [o for o in st.session_state.refurbished_orders if o["Email"] == st.session_state.user_email]
+        if my_refurb:
+            st.markdown('<div class="section-card">', unsafe_allow_html=True)
+            st.markdown("### 📦 Your Refurbished Purchases")
+            for o in my_refurb:
+                st.markdown(f"**{o['Order ID']}** • {o['Item']} × {o['Qty']} • ₹{o['Total']:,} • Status: **{o['Status']}**")
+            st.markdown('</div>', unsafe_allow_html=True)
 
-            if st.button("🔒 Lock Quote & Request Pickup", type="primary", use_container_width=True):
-                quote_id = f"ER-{random.randint(100000,999999)}"
-                order = {
-                    "Quote ID": quote_id,
-                    "Timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),
-                    "Customer Name": st.session_state.get("cust_name", st.session_state.user_name),
-                    "Phone": st.session_state.get("cust_phone"),
-                    "Email": st.session_state.user_email,
-                    "Address": st.session_state.get("cust_address", ""),
-                    "Devices": ", ".join([f"{i['model']}×{i['qty']}" for i in st.session_state.cart]),
-                    "Items Detail": st.session_state.cart.copy(),
-                    "Total Offer": f"{curr_sym}{total:,.0f}",
-                    "Status": "Pending Pickup",
-                    "Physical Verified": False,
-                    "Verified By": "",
-                    "Payment Done": False
-                }
-                st.session_state.quote_history.append(order)
-                st.session_state.cart = []
-                st.success(f"✅ Quote **{quote_id}** locked! Delivery partner will contact you soon.")
-                st.balloons()
-        else:
-            st.warning("Complete previous steps and add phone number")
-        st.markdown('</div>', unsafe_allow_html=True)
+    # ─────────────── TRADE-IN FLOW ───────────────
+    else:
+        # Sidebar categories for trade-in
+        with st.sidebar:
+            st.markdown("### 📱 Trade-in Categories")
+            for cat in DEVICE_CATALOG.keys():
+                if st.button(cat, key=f"c_{cat}", use_container_width=True,
+                             type="primary" if st.session_state.selected_category == cat else "secondary"):
+                    st.session_state.selected_category = cat
+                    st.session_state.current_step = 2
+                    st.rerun()
+            st.markdown("---")
+            selected_currency = st.selectbox("Currency", list(CURRENCIES.keys()))
+            curr_sym = CURRENCIES[selected_currency]["symbol"]
+            curr_rate = CURRENCIES[selected_currency]["rate"]
 
-    # Customer Order Status
-    my_orders = [o for o in st.session_state.quote_history if o.get("Email") == st.session_state.user_email]
-    if my_orders:
-        st.markdown('<div class="section-card">', unsafe_allow_html=True)
-        st.markdown("### 📦 Your Orders Status")
-        for o in my_orders:
-            status_color = "🟢" if o["Physical Verified"] else "🟡"
-            st.markdown(f"""
-            **{o['Quote ID']}** {status_color} {o['Status']}  
-            Devices: {o['Devices']} • Amount: {o['Total Offer']}  
-            Phone: {o['Phone']}
-            """)
-            if o["Physical Verified"] and not o["Payment Done"]:
-                st.success("Physical verification done! Delivery partner will hand over the money.")
-        st.markdown('</div>', unsafe_allow_html=True)
+        # Steps
+        steps = {1: "1. Details", 2: "2. Add Device", 3: "3. Cart", 4: "4. Lock Quote"}
+        cols = st.columns(4)
+        for i, (num, label) in enumerate(steps.items()):
+            with cols[i]:
+                if st.button(label, key=f"s_{num}", use_container_width=True,
+                             type="primary" if st.session_state.current_step == num else "secondary"):
+                    st.session_state.current_step = num
+                    st.rerun()
+
+        # STEP 1
+        if st.session_state.current_step == 1:
+            st.markdown('<div class="section-card">', unsafe_allow_html=True)
+            st.markdown("### 1. Customer & Pickup Details")
+            c1, c2 = st.columns(2)
+            with c1:
+                st.text_input("Full Name *", value=st.session_state.user_name, key="cust_name")
+                st.text_input("Email", value=st.session_state.user_email, key="cust_email")
+            with c2:
+                st.text_input("Phone Number *", placeholder="+91 98765 43210", key="cust_phone")
+                st.date_input("Preferred Pickup Date", key="cust_date")
+            st.text_area("Pickup Address *", height=80, key="cust_address")
+            if st.button("Next → Add Devices", type="primary", use_container_width=True):
+                if st.session_state.get("cust_name") and st.session_state.get("cust_phone") and st.session_state.get("cust_address"):
+                    st.session_state.current_step = 2
+                    st.rerun()
+                else:
+                    st.warning("Name, Phone and Address are mandatory")
+            st.markdown('</div>', unsafe_allow_html=True)
+
+        # STEP 2
+        elif st.session_state.current_step == 2:
+            st.markdown('<div class="section-card">', unsafe_allow_html=True)
+            st.markdown(f"### 2. Add Device • {st.session_state.selected_category}")
+            category = st.selectbox("Category", list(DEVICE_CATALOG.keys()),
+                                    index=list(DEVICE_CATALOG.keys()).index(st.session_state.selected_category))
+            st.session_state.selected_category = category
+            model = st.selectbox("Model", sorted(DEVICE_CATALOG[category].keys()))
+            c1, c2, c3 = st.columns(3)
+            with c1:
+                storage = st.selectbox("Storage", list(STORAGE_PREMIUMS.keys()))
+            with c2:
+                condition = st.selectbox("Condition", list(CONDITION_MULTIPLIERS.keys()))
+            with c3:
+                carrier = st.selectbox("Network", list(CARRIER_MODIFIERS.keys()))
+            imei = st.text_input("IMEI / Serial *")
+            qty = st.number_input("Quantity", 1, 10, 1)
+            base = DEVICE_CATALOG[category][model]
+            raw = ((base + STORAGE_PREMIUMS[storage]) * CONDITION_MULTIPLIERS[condition]) + CARRIER_MODIFIERS[carrier]
+            unit_price = max(8.0, raw) * curr_rate
+            total_line = unit_price * qty
+            st.info(f"Estimate: **{curr_sym}{total_line:,.0f}**")
+            c1, c2 = st.columns(2)
+            with c1:
+                if st.button("➕ Add to Cart", type="secondary", use_container_width=True):
+                    if imei.strip():
+                        st.session_state.cart.append({
+                            "category": category, "model": model, "storage": storage,
+                            "condition": condition, "carrier": carrier, "imei": imei,
+                            "qty": qty, "unit_price": unit_price, "line_total": total_line
+                        })
+                        st.success("Added!")
+                        st.rerun()
+                    else:
+                        st.warning("Enter IMEI")
+            with c2:
+                if st.button("Next → Cart", type="primary", use_container_width=True):
+                    st.session_state.current_step = 3
+                    st.rerun()
+            st.markdown('</div>', unsafe_allow_html=True)
+
+        # STEP 3
+        elif st.session_state.current_step == 3:
+            st.markdown('<div class="section-card">', unsafe_allow_html=True)
+            st.markdown("### 3. Your Cart")
+            if not st.session_state.cart:
+                st.info("Cart empty")
+            else:
+                total = sum(i["line_total"] for i in st.session_state.cart)
+                for idx, item in enumerate(st.session_state.cart):
+                    col1, col2 = st.columns([5, 1])
+                    with col1:
+                        st.markdown(f"""
+                        <div class="device-card">
+                            <b>{item['model']}</b> × {item['qty']}<br>
+                            <small>{item['condition']} • {item['imei']}</small><br>
+                            <span style="color:#047857; font-weight:800;">{curr_sym}{item['line_total']:,.0f}</span>
+                        </div>
+                        """, unsafe_allow_html=True)
+                    with col2:
+                        if st.button("🗑️", key=f"d{idx}"):
+                            st.session_state.cart.pop(idx)
+                            st.rerun()
+                st.markdown(f"### Total: **{curr_sym}{total:,.0f}**")
+                if st.button("Next → Lock Quote", type="primary", use_container_width=True):
+                    st.session_state.current_step = 4
+                    st.rerun()
+            st.markdown('</div>', unsafe_allow_html=True)
+
+        # STEP 4
+        elif st.session_state.current_step == 4:
+            st.markdown('<div class="section-card">', unsafe_allow_html=True)
+            st.markdown("### 4. Lock Quote")
+            if st.session_state.cart and st.session_state.get("cust_phone"):
+                total = sum(i["line_total"] for i in st.session_state.cart)
+                st.metric("Total Payout", f"{curr_sym}{total:,.0f}")
+                if st.button("🔒 Lock Quote & Request Pickup", type="primary", use_container_width=True):
+                    quote_id = f"ER-{random.randint(100000,999999)}"
+                    order = {
+                        "Quote ID": quote_id,
+                        "Timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),
+                        "Customer Name": st.session_state.get("cust_name", st.session_state.user_name),
+                        "Phone": st.session_state.get("cust_phone"),
+                        "Email": st.session_state.user_email,
+                        "Address": st.session_state.get("cust_address", ""),
+                        "Devices": ", ".join([f"{i['model']}×{i['qty']}" for i in st.session_state.cart]),
+                        "Total Offer": f"{curr_sym}{total:,.0f}",
+                        "Status": "Pending Pickup",
+                        "Physical Verified": False,
+                        "Verified By": "",
+                        "Payment Done": False
+                    }
+                    st.session_state.quote_history.append(order)
+                    st.session_state.cart = []
+                    st.success(f"✅ Quote **{quote_id}** locked!")
+                    st.balloons()
+            else:
+                st.warning("Complete previous steps + phone number")
+            st.markdown('</div>', unsafe_allow_html=True)
+
+        # Trade-in order status
+        my_orders = [o for o in st.session_state.quote_history if o.get("Email") == st.session_state.user_email]
+        if my_orders:
+            st.markdown('<div class="section-card">', unsafe_allow_html=True)
+            st.markdown("### 📦 Your Trade-in Orders")
+            for o in my_orders:
+                st.markdown(f"**{o['Quote ID']}** • {o['Status']} • {o['Devices']} • {o['Total Offer']}")
+            st.markdown('</div>', unsafe_allow_html=True)
 
 # ════════════════════════════════════════════════
 # DELIVERY PARTNER INTERFACE
@@ -410,7 +487,6 @@ if st.session_state.role == "customer":
 elif st.session_state.role == "delivery":
     st.markdown(DELIVERY_CSS, unsafe_allow_html=True)
 
-    # Delivery Login
     if not st.session_state.delivery_logged_in:
         st.markdown("""
         <div class="delivery-header">
@@ -418,13 +494,11 @@ elif st.session_state.role == "delivery":
             <div>Partner Portal</div>
         </div>
         """, unsafe_allow_html=True)
-
         st.markdown('<div class="section-card" style="max-width:480px; margin:50px auto;">', unsafe_allow_html=True)
         st.markdown("### 🚚 Delivery Partner Login")
-        d_name = st.text_input("Your Full Name", placeholder="Amit Kumar")
-        d_id = st.text_input("Partner ID / Phone", placeholder="DEL-1001 or phone number")
-
-        if st.button("Login as Delivery Partner", type="primary", use_container_width=True):
+        d_name = st.text_input("Your Full Name")
+        d_id = st.text_input("Partner ID / Phone")
+        if st.button("Login", type="primary", use_container_width=True):
             if d_name.strip() and d_id.strip():
                 st.session_state.delivery_name = d_name.strip()
                 st.session_state.delivery_logged_in = True
@@ -441,105 +515,113 @@ elif st.session_state.role == "delivery":
             <div style="font-size:1.8rem; font-weight:900;">ERaise Delivery</div>
             <div>Partner Dashboard</div>
         </div>
-        <div style="text-align:right;">
-            🚚 {st.session_state.delivery_name}
-        </div>
+        <div style="text-align:right;">🚚 {st.session_state.delivery_name}</div>
     </div>
     """, unsafe_allow_html=True)
 
     with st.sidebar:
         st.markdown(f"### Hello, {st.session_state.delivery_name}")
-        st.markdown("---")
-        if st.button("🔄 Refresh Orders", use_container_width=True):
+        if st.button("🔄 Refresh", use_container_width=True):
             st.rerun()
         if st.button("🚪 Logout", use_container_width=True):
             st.session_state.delivery_logged_in = False
             st.session_state.role = None
             st.rerun()
 
-    st.markdown("### 📋 Pending Pickups & Customers")
+    tab1, tab2, tab3, tab4 = st.tabs([
+        "🟡 Trade-in Pickups",
+        "✅ Verified (Pay Customer)",
+        "🛒 Refurbished Deliveries",
+        "👥 All Customers"
+    ])
 
-    pending = [o for o in st.session_state.quote_history if o["Status"] == "Pending Pickup"]
-    verified = [o for o in st.session_state.quote_history if o["Physical Verified"] and not o["Payment Done"]]
-
-    tab1, tab2, tab3 = st.tabs(["🟡 Pending Pickup", "✅ Verified (Pay Customer)", "👥 All Customers"])
-
+    # Tab 1: Trade-in Pickups
     with tab1:
+        pending = [o for o in st.session_state.quote_history if o["Status"] == "Pending Pickup"]
         if not pending:
-            st.info("No pending pickups right now.")
+            st.info("No pending trade-in pickups.")
         for order in pending:
-            with st.container():
-                st.markdown(f"""
-                <div class="order-card">
-                    <b>{order['Quote ID']}</b> • {order['Timestamp']}<br>
-                    👤 <b>{order['Customer Name']}</b> &nbsp; 📞 <b>{order['Phone']}</b><br>
-                    📍 {order['Address']}<br>
-                    📦 {order['Devices']}<br>
-                    💰 {order['Total Offer']}
-                </div>
-                """, unsafe_allow_html=True)
+            st.markdown(f"""
+            <div class="order-card">
+                <b>{order['Quote ID']}</b> • {order['Timestamp']}<br>
+                👤 <b>{order['Customer Name']}</b> &nbsp; 📞 <b>{order['Phone']}</b><br>
+                📍 {order['Address']}<br>
+                📦 {order['Devices']}<br>
+                💰 {order['Total Offer']}
+            </div>
+            """, unsafe_allow_html=True)
+            new_cond = st.selectbox("Actual Condition", list(CONDITION_MULTIPLIERS.keys()), key=f"cond_{order['Quote ID']}")
+            notes = st.text_area("Notes", key=f"notes_{order['Quote ID']}", height=60)
+            if st.button("✅ Physical Verification Done", key=f"ver_{order['Quote ID']}", type="primary"):
+                for o in st.session_state.quote_history:
+                    if o["Quote ID"] == order["Quote ID"]:
+                        o["Status"] = "Physical Verified – Ready for Payment"
+                        o["Physical Verified"] = True
+                        o["Verified By"] = st.session_state.delivery_name
+                        break
+                st.success("Marked as Verified!")
+                st.rerun()
+            st.markdown("---")
 
-                st.markdown("**Physical Condition Check**")
-                new_condition = st.selectbox(
-                    "Actual Condition Found",
-                    list(CONDITION_MULTIPLIERS.keys()),
-                    key=f"cond_{order['Quote ID']}"
-                )
-                notes = st.text_area("Verification Notes", key=f"notes_{order['Quote ID']}", height=70)
-
-                if st.button("✅ Successfully Checked – Physical Verification Done",
-                             key=f"verify_{order['Quote ID']}", type="primary"):
-                    # Update order
-                    for o in st.session_state.quote_history:
-                        if o["Quote ID"] == order["Quote ID"]:
-                            o["Status"] = "Physical Verified – Ready for Payment"
-                            o["Physical Verified"] = True
-                            o["Verified By"] = st.session_state.delivery_name
-                            o["Verification Notes"] = notes
-                            o["Actual Condition"] = new_condition
-                            break
-                    st.success(f"Order {order['Quote ID']} marked as Physically Verified!")
-                    st.balloons()
-                    st.rerun()
-                st.markdown("---")
-
+    # Tab 2: Pay Customer
     with tab2:
+        verified = [o for o in st.session_state.quote_history if o.get("Physical Verified") and not o.get("Payment Done")]
         if not verified:
-            st.info("No orders waiting for payment.")
+            st.info("No payments pending.")
         for order in verified:
             st.markdown(f"""
             <div class="order-card">
                 <b>{order['Quote ID']}</b><br>
                 👤 {order['Customer Name']} • 📞 {order['Phone']}<br>
-                💰 Pay: <b>{order['Total Offer']}</b><br>
-                Verified by: {order.get('Verified By')}
+                💰 Pay: <b>{order['Total Offer']}</b>
             </div>
             """, unsafe_allow_html=True)
-            if st.button(f"💵 Mark Payment Completed – {order['Quote ID']}", key=f"pay_{order['Quote ID']}"):
+            if st.button(f"💵 Payment Completed – {order['Quote ID']}", key=f"pay_{order['Quote ID']}"):
                 for o in st.session_state.quote_history:
                     if o["Quote ID"] == order["Quote ID"]:
                         o["Status"] = "Payment Completed"
                         o["Payment Done"] = True
                         break
-                st.success("Payment marked as completed!")
+                st.success("Payment done!")
                 st.rerun()
 
+    # Tab 3: Refurbished Deliveries (NEW)
     with tab3:
+        st.markdown("### 🛒 Refurbished Purchase Orders")
+        st.caption("These are devices customers bought from the Refurbished Store. Deliver them.")
+        pending_refurb = [o for o in st.session_state.refurbished_orders if o["Status"] == "Pending Delivery"]
+        if not pending_refurb:
+            st.info("No refurbished deliveries pending.")
+        for order in pending_refurb:
+            st.markdown(f"""
+            <div class="order-card">
+                <b>{order['Order ID']}</b> • {order['Timestamp']}<br>
+                👤 <b>{order['Customer Name']}</b> &nbsp; 📞 {order.get('Phone', 'N/A')}<br>
+                📦 {order['Item']} × {order['Qty']}<br>
+                💰 ₹{order['Total']:,}<br>
+                Status: {order['Status']}
+            </div>
+            """, unsafe_allow_html=True)
+            if st.button(f"✅ Mark as Delivered – {order['Order ID']}", key=f"del_{order['Order ID']}", type="primary"):
+                for o in st.session_state.refurbished_orders:
+                    if o["Order ID"] == order["Order ID"]:
+                        o["Status"] = "Delivered"
+                        o["Assigned To"] = st.session_state.delivery_name
+                        break
+                st.success("Marked as Delivered!")
+                st.rerun()
+            st.markdown("---")
+
+    # Tab 4: Customers
+    with tab4:
         st.markdown("### Registered Customers")
-        if not st.session_state.quote_history:
+        if not st.session_state.quote_history and not st.session_state.refurbished_orders:
             st.info("No customers yet.")
         else:
             customers = {}
-            for o in st.session_state.quote_history:
-                phone = o.get("Phone", "")
+            for o in st.session_state.quote_history + st.session_state.refurbished_orders:
+                phone = o.get("Phone", "N/A")
                 if phone not in customers:
-                    customers[phone] = {
-                        "Name": o.get("Customer Name"),
-                        "Phone": phone,
-                        "Email": o.get("Email"),
-                        "Orders": 0
-                    }
+                    customers[phone] = {"Name": o.get("Customer Name"), "Phone": phone, "Email": o.get("Email"), "Orders": 0}
                 customers[phone]["Orders"] += 1
-
-            df = pd.DataFrame(customers.values())
-            st.dataframe(df, use_container_width=True, hide_index=True)
+            st.dataframe(pd.DataFrame(customers.values()), use_container_width=True, hide_index=True)
