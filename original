@@ -8,132 +8,33 @@ from typing import Dict, List
 # PAGE CONFIG
 # ────────────────────────────────────────────────
 st.set_page_config(
-    page_title="ERaise | Premium Device Trade-in",
+    page_title="ERaise | Dual Role Trade-in Platform",
     page_icon="💰",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
 # ────────────────────────────────────────────────
-# SESSION STATE
+# SESSION STATE INITIALIZATION
 # ────────────────────────────────────────────────
-if "logged_in" not in st.session_state:
-    st.session_state.logged_in = False
-if "user_email" not in st.session_state:
-    st.session_state.user_email = ""
-if "is_returning_user" not in st.session_state:
-    st.session_state.is_returning_user = False
-if "known_users" not in st.session_state:
-    st.session_state.known_users = set()          # stores emails of previous users
-if "cart" not in st.session_state:
-    st.session_state.cart = []
-if "quote_history" not in st.session_state:
-    st.session_state.quote_history = []
-if "current_step" not in st.session_state:
-    st.session_state.current_step = 1
-if "selected_category" not in st.session_state:
-    st.session_state.selected_category = "Smartphones"
+defaults = {
+    "role": None,                    # "customer" or "delivery"
+    "logged_in": False,
+    "user_email": "",
+    "user_name": "",
+    "is_returning_user": False,
+    "known_customers": set(),
+    "cart": [],
+    "quote_history": [],             # All orders live here (shared)
+    "current_step": 1,
+    "selected_category": "Smartphones",
+    "delivery_logged_in": False,
+    "delivery_name": "",
+}
 
-# ────────────────────────────────────────────────
-# THEME
-# ────────────────────────────────────────────────
-st.markdown("""
-<style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
-
-    html, body, [class*="css"] {
-        font-family: 'Inter', sans-serif;
-    }
-    .stApp {
-        background: linear-gradient(160deg, #fdf2f8 0%, #f0f9ff 45%, #f0fdf4 100%);
-        color: #1e293b;
-    }
-    .eraise-header {
-        background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 45%, #ec4899 100%);
-        border-radius: 0 0 28px 28px;
-        padding: 26px 36px;
-        margin: -1rem -1rem 28px -1rem;
-        box-shadow: 0 12px 36px rgba(99, 102, 241, 0.25);
-        color: white;
-    }
-    .eraise-logo {
-        font-size: 2.3rem;
-        font-weight: 900;
-        color: white;
-    }
-    .section-card {
-        background: rgba(255,255,255,0.94);
-        border-radius: 20px;
-        padding: 28px 32px;
-        margin-bottom: 24px;
-        box-shadow: 0 8px 28px rgba(99, 102, 241, 0.08);
-        border: 1px solid rgba(199, 210, 254, 0.6);
-    }
-    .login-card {
-        max-width: 480px;
-        margin: 60px auto;
-        background: white;
-        border-radius: 24px;
-        padding: 40px 36px;
-        box-shadow: 0 20px 50px rgba(99, 102, 241, 0.15);
-        border: 1px solid #e0e7ff;
-    }
-    .device-image-card {
-        background: linear-gradient(135deg, #fdf4ff, #f0f9ff);
-        border-radius: 18px;
-        padding: 20px;
-        text-align: center;
-        border: 1px solid #e9d5ff;
-        margin-bottom: 20px;
-    }
-    [data-testid="stMetric"] {
-        background: linear-gradient(145deg, #ecfdf5, #f0fdfa);
-        border: 1px solid #a7f3d0;
-        border-radius: 18px;
-        padding: 18px 22px;
-    }
-    [data-testid="stMetricValue"] {
-        font-size: 2rem !important;
-        color: #047857 !important;
-        font-weight: 800 !important;
-    }
-    section[data-testid="stSidebar"] {
-        background: linear-gradient(180deg, #fdf4ff 0%, #f0f9ff 100%) !important;
-    }
-    section[data-testid="stSidebar"] * {
-        color: #4c1d95 !important;
-    }
-    .stButton > button {
-        border-radius: 14px !important;
-        font-weight: 700 !important;
-    }
-    .stButton > button[kind="primary"] {
-        background: linear-gradient(90deg, #f472b6, #ec4899) !important;
-        color: white !important;
-        border: none !important;
-    }
-    .stButton > button[kind="secondary"] {
-        background: linear-gradient(90deg, #a5b4fc, #818cf8) !important;
-        color: white !important;
-        border: none !important;
-    }
-    .device-card {
-        background: linear-gradient(135deg, #fdf4ff, #f0f9ff);
-        border: 1px solid #e9d5ff;
-        border-radius: 16px;
-        padding: 16px 20px;
-        margin-bottom: 12px;
-    }
-    .eraise-footer {
-        text-align: center;
-        padding: 32px 16px;
-        color: #64748b;
-        margin-top: 40px;
-        background: rgba(255,255,255,0.8);
-        border-radius: 20px 20px 0 0;
-    }
-</style>
-""", unsafe_allow_html=True)
+for key, value in defaults.items():
+    if key not in st.session_state:
+        st.session_state[key] = value
 
 # ────────────────────────────────────────────────
 # DATA
@@ -141,49 +42,25 @@ st.markdown("""
 DEVICE_CATALOG = {
     "Smartphones": {
         "iPhone 16 Pro Max": 980, "iPhone 16 Pro": 850, "iPhone 16": 680,
-        "iPhone 15 Pro Max": 750, "iPhone 15": 550, "iPhone 14": 400,
-        "Samsung Galaxy S24 Ultra": 720, "Samsung Galaxy S24": 480,
+        "iPhone 15 Pro Max": 750, "iPhone 15": 550, "Samsung Galaxy S24 Ultra": 720,
         "Samsung Galaxy Z Fold 6": 850, "Google Pixel 9 Pro XL": 680,
         "OnePlus 12": 480, "Xiaomi 14": 420, "Nothing Phone (2a)": 180,
     },
     "Tablets": {
-        "iPad Pro 13-inch (M4)": 950, "iPad Air (M2)": 520,
-        "iPad (10th gen)": 320, "Samsung Galaxy Tab S9 Ultra": 680,
-        "Xiaomi Pad 6": 240,
+        "iPad Pro 13-inch (M4)": 950, "iPad Air (M2)": 520, "Samsung Galaxy Tab S9 Ultra": 680,
     },
     "Laptops": {
-        "MacBook Pro 16-inch (M3 Max)": 2200, "MacBook Air 15-inch (M3)": 1100,
-        "Dell XPS 15": 980, "Lenovo ThinkPad X1 Carbon": 920,
+        "MacBook Pro 16-inch (M3 Max)": 2200, "MacBook Air 15-inch (M3)": 1100, "Dell XPS 15": 980,
     },
     "Smartwatches": {
-        "Apple Watch Ultra 2": 520, "Apple Watch Series 10": 320,
-        "Samsung Galaxy Watch 7": 220, "Google Pixel Watch 3": 240,
+        "Apple Watch Ultra 2": 520, "Apple Watch Series 10": 320, "Samsung Galaxy Watch 7": 220,
     },
     "Audio": {
-        "Apple AirPods Max": 380, "Apple AirPods Pro 2": 180,
-        "Sony WH-1000XM5": 280, "Bose QuietComfort Ultra": 320,
+        "Apple AirPods Max": 380, "Sony WH-1000XM5": 280, "Bose QuietComfort Ultra": 320,
     },
     "Gaming": {
-        "PlayStation 5 (Disc)": 380, "Xbox Series X": 360,
-        "Nintendo Switch OLED": 240, "Steam Deck OLED": 420,
+        "PlayStation 5 (Disc)": 380, "Xbox Series X": 360, "Nintendo Switch OLED": 240,
     }
-}
-
-# Simple device images (using placeholder service + emoji fallback)
-DEVICE_IMAGES = {
-    # Smartphones
-    "iPhone 16 Pro Max": "https://fdn2.gsmarena.com/vv/bigpic/apple-iphone-16-pro-max.jpg",
-    "iPhone 16 Pro": "https://fdn2.gsmarena.com/vv/bigpic/apple-iphone-16-pro.jpg",
-    "iPhone 16": "https://fdn2.gsmarena.com/vv/bigpic/apple-iphone-16.jpg",
-    "iPhone 15 Pro Max": "https://fdn2.gsmarena.com/vv/bigpic/apple-iphone-15-pro-max.jpg",
-    "Samsung Galaxy S24 Ultra": "https://fdn2.gsmarena.com/vv/bigpic/samsung-galaxy-s24-ultra-5g.jpg",
-    "Samsung Galaxy Z Fold 6": "https://fdn2.gsmarena.com/vv/bigpic/samsung-galaxy-z-fold6.jpg",
-    "Google Pixel 9 Pro XL": "https://fdn2.gsmarena.com/vv/bigpic/google-pixel-9-pro-xl.jpg",
-    "OnePlus 12": "https://fdn2.gsmarena.com/vv/bigpic/oneplus-12.jpg",
-    "Nothing Phone (2a)": "https://fdn2.gsmarena.com/vv/bigpic/nothing-phone-2a.jpg",
-    
-    # Default fallback
-    "default": "https://via.placeholder.com/300x400/8b5cf6/ffffff?text=Device"
 }
 
 CONDITION_MULTIPLIERS = {
@@ -207,323 +84,462 @@ CARRIER_MODIFIERS = {
 CURRENCIES = {
     "INR (₹)": {"symbol": "₹", "rate": 83.50},
     "USD ($)": {"symbol": "$", "rate": 1.0},
-    "EUR (€)": {"symbol": "€", "rate": 0.92},
-    "GBP (£)": {"symbol": "£", "rate": 0.79},
 }
 
-def get_device_image(model: str) -> str:
-    return DEVICE_IMAGES.get(model, DEVICE_IMAGES["default"])
+# ────────────────────────────────────────────────
+# CUSTOMER THEME (Colorful - Keep as is)
+# ────────────────────────────────────────────────
+CUSTOMER_CSS = """
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+    html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
+    .stApp { background: linear-gradient(160deg, #fdf2f8 0%, #f0f9ff 45%, #f0fdf4 100%); }
+    .eraise-header {
+        background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 45%, #ec4899 100%);
+        border-radius: 0 0 28px 28px; padding: 26px 36px; margin: -1rem -1rem 28px -1rem;
+        box-shadow: 0 12px 36px rgba(99, 102, 241, 0.25); color: white;
+    }
+    .eraise-logo { font-size: 2.2rem; font-weight: 900; color: white; }
+    .section-card {
+        background: rgba(255,255,255,0.94); border-radius: 20px; padding: 28px 32px;
+        margin-bottom: 24px; box-shadow: 0 8px 28px rgba(99, 102, 241, 0.08);
+        border: 1px solid rgba(199, 210, 254, 0.6);
+    }
+    .stButton > button[kind="primary"] {
+        background: linear-gradient(90deg, #f472b6, #ec4899) !important; color: white !important; border: none !important;
+    }
+    .stButton > button[kind="secondary"] {
+        background: linear-gradient(90deg, #a5b4fc, #818cf8) !important; color: white !important; border: none !important;
+    }
+    [data-testid="stMetric"] { background: linear-gradient(145deg, #ecfdf5, #f0fdfa); border: 1px solid #a7f3d0; border-radius: 16px; }
+    [data-testid="stMetricValue"] { color: #047857 !important; font-weight: 800 !important; }
+    .device-card {
+        background: linear-gradient(135deg, #fdf4ff, #f0f9ff); border: 1px solid #e9d5ff;
+        border-radius: 16px; padding: 16px 20px; margin-bottom: 12px;
+    }
+</style>
+"""
 
 # ────────────────────────────────────────────────
-# LOGIN PAGE
+# DELIVERY THEME (Light Blue / Clean)
 # ────────────────────────────────────────────────
-if not st.session_state.logged_in:
+DELIVERY_CSS = """
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+    html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
+    .stApp { background: linear-gradient(160deg, #f0f9ff 0%, #e0f2fe 50%, #f0fdfa 100%); }
+    .delivery-header {
+        background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
+        border-radius: 0 0 28px 28px; padding: 26px 36px; margin: -1rem -1rem 28px -1rem;
+        box-shadow: 0 12px 36px rgba(14, 165, 233, 0.25); color: white;
+    }
+    .section-card {
+        background: white; border-radius: 20px; padding: 28px 32px; margin-bottom: 24px;
+        box-shadow: 0 8px 28px rgba(14, 165, 233, 0.08); border: 1px solid #bae6fd;
+    }
+    .stButton > button[kind="primary"] {
+        background: linear-gradient(90deg, #0ea5e9, #0284c7) !important; color: white !important; border: none !important;
+    }
+    .stButton > button[kind="secondary"] {
+        background: linear-gradient(90deg, #67e8f9, #22d3ee) !important; color: #0c4a6e !important; border: none !important;
+    }
+    .order-card {
+        background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 16px;
+        padding: 18px 22px; margin-bottom: 14px;
+    }
+</style>
+"""
+
+# ────────────────────────────────────────────────
+# ROLE SELECTION PAGE
+# ────────────────────────────────────────────────
+if st.session_state.role is None:
     st.markdown("""
+    <div style="text-align:center; padding: 60px 20px;">
+        <h1 style="font-size:3rem; font-weight:900; background: linear-gradient(90deg,#6366f1,#ec4899);
+        -webkit-background-clip:text; -webkit-text-fill-color:transparent;">ERaise</h1>
+        <p style="font-size:1.3rem; color:#64748b;">Choose your role to continue</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        st.markdown("### Select Interface")
+        if st.button("👤  I am a Customer", use_container_width=True, type="primary"):
+            st.session_state.role = "customer"
+            st.rerun()
+        st.write("")
+        if st.button("🚚  I am a Delivery Partner", use_container_width=True, type="secondary"):
+            st.session_state.role = "delivery"
+            st.rerun()
+    st.stop()
+
+# ════════════════════════════════════════════════
+# CUSTOMER INTERFACE
+# ════════════════════════════════════════════════
+if st.session_state.role == "customer":
+    st.markdown(CUSTOMER_CSS, unsafe_allow_html=True)
+
+    # ----- Customer Login -----
+    if not st.session_state.logged_in:
+        st.markdown("""
+        <div class="eraise-header">
+            <div class="eraise-logo">ERaise</div>
+            <div style="color:#fce7f3;">Customer Portal</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        st.markdown('<div class="section-card" style="max-width:500px; margin:40px auto;">', unsafe_allow_html=True)
+        st.markdown("### 🔐 Customer Login / Sign In")
+        email = st.text_input("Email Address", placeholder="you@example.com")
+        name = st.text_input("Full Name", placeholder="Rahul Sharma")
+
+        if st.button("Continue", type="primary", use_container_width=True):
+            if email and "@" in email and name.strip():
+                email = email.strip().lower()
+                st.session_state.user_email = email
+                st.session_state.user_name = name.strip()
+                st.session_state.is_returning_user = email in st.session_state.known_customers
+                st.session_state.known_customers.add(email)
+                st.session_state.logged_in = True
+                st.rerun()
+            else:
+                st.error("Please enter valid Name and Email")
+        st.markdown('</div>', unsafe_allow_html=True)
+        st.stop()
+
+    # ----- Customer Main App -----
+    now = datetime.datetime.now().strftime("%A, %d %B %Y • %I:%M %p IST")
+    st.markdown(f"""
     <div class="eraise-header">
         <div>
             <div class="eraise-logo">ERaise</div>
-            <div style="font-size:1.15rem; font-weight:600; color:#fce7f3; margin-top:4px;">
-                Premium Multi-Device Trade-in Platform
-            </div>
+            <div style="color:#fce7f3; font-size:1rem;">Customer Portal</div>
+        </div>
+        <div style="text-align:right; font-size:0.9rem;">
+            👤 {st.session_state.user_name}<br>{st.session_state.user_email}<br>{now}
         </div>
     </div>
     """, unsafe_allow_html=True)
 
-    st.markdown('<div class="login-card">', unsafe_allow_html=True)
-    st.markdown("### 🔐 Login / Sign In")
-    st.write("Enter your email to continue. We’ll check if you’ve worked with us before.")
+    if st.session_state.is_returning_user:
+        st.success(f"👋 Welcome back, **{st.session_state.user_name}**!")
+    else:
+        st.info(f"🎉 Welcome **{st.session_state.user_name}**! First time with ERaise.")
 
-    email = st.text_input("Email Address", placeholder="you@example.com", key="login_email")
-    name = st.text_input("Full Name (for new users)", placeholder="Rahul Sharma", key="login_name")
-
-    col1, col2 = st.columns(2)
-    with col1:
-        if st.button("Login / Continue", type="primary", use_container_width=True):
-            if not email or "@" not in email:
-                st.error("Please enter a valid email address")
-            else:
-                email = email.strip().lower()
-                st.session_state.user_email = email
-
-                if email in st.session_state.known_users:
-                    st.session_state.is_returning_user = True
-                    st.success(f"Welcome back! Great to see you again.")
-                else:
-                    st.session_state.known_users.add(email)
-                    st.session_state.is_returning_user = False
-                    st.success("Welcome! You’re new here. Let’s get started.")
-
-                st.session_state.logged_in = True
+    # Sidebar
+    with st.sidebar:
+        st.markdown("### 📱 Categories")
+        for cat in DEVICE_CATALOG.keys():
+            if st.button(cat, key=f"c_{cat}", use_container_width=True,
+                         type="primary" if st.session_state.selected_category == cat else "secondary"):
+                st.session_state.selected_category = cat
+                st.session_state.current_step = 2
                 st.rerun()
 
-    with col2:
-        if st.button("Continue as Guest", use_container_width=True):
-            st.session_state.user_email = "guest@eraise.com"
-            st.session_state.is_returning_user = False
-            st.session_state.logged_in = True
+        st.markdown("---")
+        selected_currency = st.selectbox("Currency", list(CURRENCIES.keys()))
+        curr_sym = CURRENCIES[selected_currency]["symbol"]
+        curr_rate = CURRENCIES[selected_currency]["rate"]
+
+        st.markdown("---")
+        if st.button("🚪 Logout", use_container_width=True):
+            st.session_state.logged_in = False
+            st.session_state.role = None
             st.rerun()
 
-    st.markdown('</div>', unsafe_allow_html=True)
-    st.stop()   # Stop here until logged in
+    # Steps
+    steps = {1: "1. Customer", 2: "2. Add Devices", 3: "3. Cart", 4: "4. Lock Quote"}
+    cols = st.columns(4)
+    for i, (num, label) in enumerate(steps.items()):
+        with cols[i]:
+            if st.button(label, key=f"s_{num}", use_container_width=True,
+                         type="primary" if st.session_state.current_step == num else "secondary"):
+                st.session_state.current_step = num
+                st.rerun()
 
-# ────────────────────────────────────────────────
-# MAIN APP (After Login)
-# ────────────────────────────────────────────────
+    # STEP 1
+    if st.session_state.current_step == 1:
+        st.markdown('<div class="section-card">', unsafe_allow_html=True)
+        st.markdown("### 1. Customer & Pickup Details")
+        c1, c2 = st.columns(2)
+        with c1:
+            st.text_input("Full Name *", value=st.session_state.user_name, key="cust_name")
+            st.text_input("Email", value=st.session_state.user_email, key="cust_email")
+        with c2:
+            phone = st.text_input("Phone Number *", placeholder="+91 98765 43210", key="cust_phone")
+            st.date_input("Preferred Pickup Date", key="cust_date")
 
-# Header
-now = datetime.datetime.now()
-current_time_str = now.strftime("%A, %d %B %Y • %I:%M %p IST")
+        address = st.text_area("Pickup Address *", height=80, key="cust_address")
 
-st.markdown(f"""
-<div class="eraise-header">
-    <div>
-        <div class="eraise-logo">ERaise</div>
-        <div style="font-size:1.1rem; color:#fce7f3; margin-top:4px;">
-            Colorful • Instant • Multi-Device Trade-in
-        </div>
-    </div>
-    <div style="text-align:right;">
-        <div style="background:rgba(255,255,255,0.2); padding:6px 14px; border-radius:999px; font-size:0.9rem;">
-            👤 {st.session_state.user_email}
-        </div>
-        <div style="margin-top:8px; font-size:0.85rem; color:#fce7f3;">{current_time_str}</div>
-    </div>
-</div>
-""", unsafe_allow_html=True)
-
-# Welcome message
-if st.session_state.is_returning_user:
-    st.success(f"👋 Welcome back, **{st.session_state.user_email}**! Ready to trade in more devices?")
-else:
-    st.info(f"🎉 Welcome **{st.session_state.user_email}**! This is your first time with ERaise.")
-
-# ────────────────────────────────────────────────
-# SIDEBAR
-# ────────────────────────────────────────────────
-with st.sidebar:
-    st.markdown("### 📱 Categories")
-    for cat in DEVICE_CATALOG.keys():
-        is_selected = st.session_state.selected_category == cat
-        btn_type = "primary" if is_selected else "secondary"
-        if st.button(cat, key=f"cat_{cat}", use_container_width=True, type=btn_type):
-            st.session_state.selected_category = cat
-            st.session_state.current_step = 2
-            st.rerun()
-
-    st.markdown("---")
-    st.markdown("### 🎨 Settings")
-    selected_currency = st.selectbox("Currency", list(CURRENCIES.keys()), index=0)
-    curr_sym = CURRENCIES[selected_currency]["symbol"]
-    curr_rate = CURRENCIES[selected_currency]["rate"]
-
-    st.markdown("---")
-    if st.button("🚪 Logout", use_container_width=True):
-        st.session_state.logged_in = False
-        st.session_state.user_email = ""
-        st.rerun()
-
-# ────────────────────────────────────────────────
-# STEP NAVIGATION
-# ────────────────────────────────────────────────
-steps = {1: "1. Customer", 2: "2. Add Devices", 3: "3. Review Cart", 4: "4. Lock Quote"}
-cols = st.columns(4)
-for i, (num, label) in enumerate(steps.items()):
-    with cols[i]:
-        btn_type = "primary" if st.session_state.current_step == num else "secondary"
-        if st.button(label, key=f"step_{num}", use_container_width=True, type=btn_type):
-            st.session_state.current_step = num
-            st.rerun()
-
-st.markdown("")
-
-# ────────────────────────────────────────────────
-# STEP 1: CUSTOMER
-# ────────────────────────────────────────────────
-if st.session_state.current_step == 1:
-    st.markdown('<div class="section-card">', unsafe_allow_html=True)
-    st.markdown("### 1. Customer & Pickup Details")
-
-    c1, c2, c3 = st.columns(3)
-    with c1:
-        customer_name = st.text_input("Full Name *", key="cust_name")
-    with c2:
-        customer_phone = st.text_input("Contact Number *", key="cust_phone")
-    with c3:
-        customer_email = st.text_input("Email", value=st.session_state.user_email, key="cust_email")
-
-    customer_address = st.text_area("Pickup Address *", height=90, key="cust_address")
-    preferred_date = st.date_input("Preferred Pickup Date", key="cust_date")
-
-    if st.button("Next → Add Devices", type="primary", use_container_width=True):
-        if customer_name.strip() and customer_phone.strip() and customer_address.strip():
-            st.session_state.current_step = 2
-            st.rerun()
-        else:
-            st.warning("Please fill Name, Phone and Address")
-    st.markdown('</div>', unsafe_allow_html=True)
-
-# ────────────────────────────────────────────────
-# STEP 2: ADD DEVICE + IMAGE
-# ────────────────────────────────────────────────
-elif st.session_state.current_step == 2:
-    st.markdown('<div class="section-card">', unsafe_allow_html=True)
-    st.markdown(f"### 2. Add Device  •  **{st.session_state.selected_category}**")
-
-    category = st.session_state.selected_category
-    category = st.selectbox("Category", list(DEVICE_CATALOG.keys()),
-                            index=list(DEVICE_CATALOG.keys()).index(category), key="add_cat")
-    st.session_state.selected_category = category
-
-    model = st.selectbox("Model", sorted(DEVICE_CATALOG[category].keys()), key="add_model")
-
-    # ---------- DEVICE IMAGE ----------
-    img_url = get_device_image(model)
-    col_img, col_info = st.columns([1, 2])
-    with col_img:
-        st.markdown('<div class="device-image-card">', unsafe_allow_html=True)
-        try:
-            st.image(img_url, width=220, caption=model)
-        except:
-            st.markdown(f"### 📱\n**{model}**")
+        if st.button("Next → Add Devices", type="primary", use_container_width=True):
+            if st.session_state.get("cust_name") and st.session_state.get("cust_phone") and st.session_state.get("cust_address"):
+                st.session_state.current_step = 2
+                st.rerun()
+            else:
+                st.warning("Name, Phone Number and Address are mandatory")
         st.markdown('</div>', unsafe_allow_html=True)
 
-    with col_info:
-        s1, s2 = st.columns(2)
-        with s1:
-            storage = st.selectbox("Storage / RAM", list(STORAGE_PREMIUMS.keys()), key="add_storage")
-            condition = st.selectbox("Condition", list(CONDITION_MULTIPLIERS.keys()), key="add_condition")
-        with s2:
-            carrier = st.selectbox("Network Status", list(CARRIER_MODIFIERS.keys()), key="add_carrier")
-            qty = st.number_input("Quantity", min_value=1, max_value=10, value=1, key="add_qty")
+    # STEP 2
+    elif st.session_state.current_step == 2:
+        st.markdown('<div class="section-card">', unsafe_allow_html=True)
+        st.markdown(f"### 2. Add Device • {st.session_state.selected_category}")
 
-        imei = st.text_input("IMEI / Serial Number *", key="add_imei")
+        category = st.selectbox("Category", list(DEVICE_CATALOG.keys()),
+                                index=list(DEVICE_CATALOG.keys()).index(st.session_state.selected_category))
+        st.session_state.selected_category = category
+        model = st.selectbox("Model", sorted(DEVICE_CATALOG[category].keys()))
 
-    # Price calculation
-    base = DEVICE_CATALOG[category][model]
-    raw = ((base + STORAGE_PREMIUMS[storage]) * CONDITION_MULTIPLIERS[condition]) + CARRIER_MODIFIERS[carrier]
-    unit_price = max(8.0, raw) * curr_rate
-    line_total = unit_price * qty
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            storage = st.selectbox("Storage", list(STORAGE_PREMIUMS.keys()))
+        with c2:
+            condition = st.selectbox("Condition", list(CONDITION_MULTIPLIERS.keys()))
+        with c3:
+            carrier = st.selectbox("Network", list(CARRIER_MODIFIERS.keys()))
 
-    st.info(f"**Live Estimate:** {curr_sym}{unit_price:,.0f} × {qty} = **{curr_sym}{line_total:,.0f}**")
+        imei = st.text_input("IMEI / Serial *")
+        qty = st.number_input("Quantity", 1, 10, 1)
 
-    c1, c2 = st.columns(2)
-    with c1:
-        if st.button("➕ Add to Cart", type="secondary", use_container_width=True):
-            if not imei.strip():
-                st.warning("Please enter IMEI / Serial")
-            else:
-                st.session_state.cart.append({
-                    "category": category, "model": model, "storage": storage,
-                    "carrier": carrier, "condition": condition, "imei": imei.strip(),
-                    "qty": qty, "unit_price": unit_price, "line_total": line_total
-                })
-                st.success(f"Added **{model}**")
-                st.rerun()
-    with c2:
-        if st.button("Next → Review Cart", type="primary", use_container_width=True):
-            st.session_state.current_step = 3
-            st.rerun()
+        base = DEVICE_CATALOG[category][model]
+        raw = ((base + STORAGE_PREMIUMS[storage]) * CONDITION_MULTIPLIERS[condition]) + CARRIER_MODIFIERS[carrier]
+        unit_price = max(8.0, raw) * curr_rate
+        total_line = unit_price * qty
 
-    st.markdown('</div>', unsafe_allow_html=True)
-
-# ────────────────────────────────────────────────
-# STEP 3: CART
-# ────────────────────────────────────────────────
-elif st.session_state.current_step == 3:
-    st.markdown('<div class="section-card">', unsafe_allow_html=True)
-    st.markdown("### 3. Your Cart")
-
-    if not st.session_state.cart:
-        st.info("Cart is empty.")
-        if st.button("← Add Devices"):
-            st.session_state.current_step = 2
-            st.rerun()
-    else:
-        total = 0
-        for idx, item in enumerate(st.session_state.cart):
-            total += item["line_total"]
-            col1, col2 = st.columns([5, 1])
-            with col1:
-                st.markdown(f"""
-                <div class="device-card">
-                    <strong>{item['model']}</strong><br>
-                    <small>{item['category']} • {item['condition']} • Qty: {item['qty']}</small><br>
-                    <span style="font-weight:800; color:#047857; font-size:1.15rem;">{curr_sym}{item['line_total']:,.0f}</span>
-                </div>
-                """, unsafe_allow_html=True)
-            with col2:
-                if st.button("🗑️", key=f"del_{idx}"):
-                    st.session_state.cart.pop(idx)
-                    st.rerun()
-
-        st.markdown(f"### Total: **{curr_sym}{total:,.0f}**")
+        st.info(f"Estimate: **{curr_sym}{total_line:,.0f}**")
 
         c1, c2 = st.columns(2)
         with c1:
-            if st.button("← Add More", use_container_width=True):
-                st.session_state.current_step = 2
-                st.rerun()
+            if st.button("➕ Add to Cart", type="secondary", use_container_width=True):
+                if imei.strip():
+                    st.session_state.cart.append({
+                        "category": category, "model": model, "storage": storage,
+                        "condition": condition, "carrier": carrier, "imei": imei,
+                        "qty": qty, "unit_price": unit_price, "line_total": total_line
+                    })
+                    st.success("Added!")
+                    st.rerun()
+                else:
+                    st.warning("Enter IMEI")
         with c2:
+            if st.button("Next → Cart", type="primary", use_container_width=True):
+                st.session_state.current_step = 3
+                st.rerun()
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    # STEP 3
+    elif st.session_state.current_step == 3:
+        st.markdown('<div class="section-card">', unsafe_allow_html=True)
+        st.markdown("### 3. Your Cart")
+        if not st.session_state.cart:
+            st.info("Cart empty")
+        else:
+            total = sum(i["line_total"] for i in st.session_state.cart)
+            for idx, item in enumerate(st.session_state.cart):
+                col1, col2 = st.columns([5,1])
+                with col1:
+                    st.markdown(f"""
+                    <div class="device-card">
+                        <b>{item['model']}</b> × {item['qty']}<br>
+                        <small>{item['condition']} • {item['imei']}</small><br>
+                        <span style="color:#047857; font-weight:800;">{curr_sym}{item['line_total']:,.0f}</span>
+                    </div>
+                    """, unsafe_allow_html=True)
+                with col2:
+                    if st.button("🗑️", key=f"d{idx}"):
+                        st.session_state.cart.pop(idx)
+                        st.rerun()
+            st.markdown(f"### Total: **{curr_sym}{total:,.0f}**")
             if st.button("Next → Lock Quote", type="primary", use_container_width=True):
                 st.session_state.current_step = 4
                 st.rerun()
-    st.markdown('</div>', unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
 
-# ────────────────────────────────────────────────
-# STEP 4: LOCK QUOTE
-# ────────────────────────────────────────────────
-elif st.session_state.current_step == 4:
-    st.markdown('<div class="section-card">', unsafe_allow_html=True)
-    st.markdown("### 4. Lock Quote")
+    # STEP 4
+    elif st.session_state.current_step == 4:
+        st.markdown('<div class="section-card">', unsafe_allow_html=True)
+        st.markdown("### 4. Lock Quote")
+        if st.session_state.cart and st.session_state.get("cust_phone"):
+            total = sum(i["line_total"] for i in st.session_state.cart)
+            st.metric("Total Payout", f"{curr_sym}{total:,.0f}")
 
-    name = st.session_state.get("cust_name", "")
-    phone = st.session_state.get("cust_phone", "")
-    address = st.session_state.get("cust_address", "")
+            if st.button("🔒 Lock Quote & Request Pickup", type="primary", use_container_width=True):
+                quote_id = f"ER-{random.randint(100000,999999)}"
+                order = {
+                    "Quote ID": quote_id,
+                    "Timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),
+                    "Customer Name": st.session_state.get("cust_name", st.session_state.user_name),
+                    "Phone": st.session_state.get("cust_phone"),
+                    "Email": st.session_state.user_email,
+                    "Address": st.session_state.get("cust_address", ""),
+                    "Devices": ", ".join([f"{i['model']}×{i['qty']}" for i in st.session_state.cart]),
+                    "Items Detail": st.session_state.cart.copy(),
+                    "Total Offer": f"{curr_sym}{total:,.0f}",
+                    "Status": "Pending Pickup",
+                    "Physical Verified": False,
+                    "Verified By": "",
+                    "Payment Done": False
+                }
+                st.session_state.quote_history.append(order)
+                st.session_state.cart = []
+                st.success(f"✅ Quote **{quote_id}** locked! Delivery partner will contact you soon.")
+                st.balloons()
+        else:
+            st.warning("Complete previous steps and add phone number")
+        st.markdown('</div>', unsafe_allow_html=True)
 
-    if not (name and phone and address):
-        st.warning("Please complete Customer details in Step 1")
-    elif not st.session_state.cart:
-        st.warning("Cart is empty")
-    else:
-        total = sum(i["line_total"] for i in st.session_state.cart)
-        st.success(f"Ready for **{len(st.session_state.cart)}** device(s)")
-        st.metric("Total Payout", f"{curr_sym}{total:,.0f}")
+    # Customer Order Status
+    my_orders = [o for o in st.session_state.quote_history if o.get("Email") == st.session_state.user_email]
+    if my_orders:
+        st.markdown('<div class="section-card">', unsafe_allow_html=True)
+        st.markdown("### 📦 Your Orders Status")
+        for o in my_orders:
+            status_color = "🟢" if o["Physical Verified"] else "🟡"
+            st.markdown(f"""
+            **{o['Quote ID']}** {status_color} {o['Status']}  
+            Devices: {o['Devices']} • Amount: {o['Total Offer']}  
+            Phone: {o['Phone']}
+            """)
+            if o["Physical Verified"] and not o["Payment Done"]:
+                st.success("Physical verification done! Delivery partner will hand over the money.")
+        st.markdown('</div>', unsafe_allow_html=True)
 
-        if st.button("🔒 Lock Quote & Generate Voucher", type="primary", use_container_width=True):
-            quote_id = f"ER-{random.randint(100000,999999)}"
-            models = ", ".join([f"{i['model']}×{i['qty']}" for i in st.session_state.cart])
+# ════════════════════════════════════════════════
+# DELIVERY PARTNER INTERFACE
+# ════════════════════════════════════════════════
+elif st.session_state.role == "delivery":
+    st.markdown(DELIVERY_CSS, unsafe_allow_html=True)
 
-            st.session_state.quote_history.append({
-                "Quote ID": quote_id,
-                "Timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),
-                "Customer": name,
-                "Email": st.session_state.user_email,
-                "Phone": phone,
-                "Devices": models,
-                "Total Offer": f"{curr_sym}{total:,.0f}",
-                "Status": "Approved – Pending Inspection"
-            })
-            st.success(f"✅ Quote **{quote_id}** locked!\n\nTotal: **{curr_sym}{total:,.0f}**")
-            st.balloons()
-            st.session_state.cart = []
-    st.markdown('</div>', unsafe_allow_html=True)
+    # Delivery Login
+    if not st.session_state.delivery_logged_in:
+        st.markdown("""
+        <div class="delivery-header">
+            <div style="font-size:2rem; font-weight:900;">ERaise Delivery</div>
+            <div>Partner Portal</div>
+        </div>
+        """, unsafe_allow_html=True)
 
-# ────────────────────────────────────────────────
-# HISTORY
-# ────────────────────────────────────────────────
-if st.session_state.quote_history:
-    st.markdown('<div class="section-card">', unsafe_allow_html=True)
-    st.markdown("### 📋 Quote History")
-    df = pd.DataFrame(st.session_state.quote_history)
-    st.dataframe(df, use_container_width=True, hide_index=True)
-    st.download_button("📥 Export CSV", df.to_csv(index=False).encode(), "eraise_ledger.csv", "text/csv")
-    st.markdown('</div>', unsafe_allow_html=True)
+        st.markdown('<div class="section-card" style="max-width:480px; margin:50px auto;">', unsafe_allow_html=True)
+        st.markdown("### 🚚 Delivery Partner Login")
+        d_name = st.text_input("Your Full Name", placeholder="Amit Kumar")
+        d_id = st.text_input("Partner ID / Phone", placeholder="DEL-1001 or phone number")
 
-# Footer
-st.markdown(f"""
-<div class="eraise-footer">
-    <div style="font-size:1.4rem; font-weight:900; color:#7c3aed;">ERaise</div>
-    <div style="margin-top:6px;">Soft • Colorful • Multi-Device Trade-in</div>
-    <div style="margin-top:8px; font-size:0.85rem;">© 2026 ERaise</div>
-</div>
-""", unsafe_allow_html=True)
+        if st.button("Login as Delivery Partner", type="primary", use_container_width=True):
+            if d_name.strip() and d_id.strip():
+                st.session_state.delivery_name = d_name.strip()
+                st.session_state.delivery_logged_in = True
+                st.rerun()
+            else:
+                st.error("Enter Name and ID")
+        st.markdown('</div>', unsafe_allow_html=True)
+        st.stop()
+
+    # Delivery Dashboard
+    st.markdown(f"""
+    <div class="delivery-header">
+        <div>
+            <div style="font-size:1.8rem; font-weight:900;">ERaise Delivery</div>
+            <div>Partner Dashboard</div>
+        </div>
+        <div style="text-align:right;">
+            🚚 {st.session_state.delivery_name}
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    with st.sidebar:
+        st.markdown(f"### Hello, {st.session_state.delivery_name}")
+        st.markdown("---")
+        if st.button("🔄 Refresh Orders", use_container_width=True):
+            st.rerun()
+        if st.button("🚪 Logout", use_container_width=True):
+            st.session_state.delivery_logged_in = False
+            st.session_state.role = None
+            st.rerun()
+
+    st.markdown("### 📋 Pending Pickups & Customers")
+
+    pending = [o for o in st.session_state.quote_history if o["Status"] == "Pending Pickup"]
+    verified = [o for o in st.session_state.quote_history if o["Physical Verified"] and not o["Payment Done"]]
+
+    tab1, tab2, tab3 = st.tabs(["🟡 Pending Pickup", "✅ Verified (Pay Customer)", "👥 All Customers"])
+
+    with tab1:
+        if not pending:
+            st.info("No pending pickups right now.")
+        for order in pending:
+            with st.container():
+                st.markdown(f"""
+                <div class="order-card">
+                    <b>{order['Quote ID']}</b> • {order['Timestamp']}<br>
+                    👤 <b>{order['Customer Name']}</b> &nbsp; 📞 <b>{order['Phone']}</b><br>
+                    📍 {order['Address']}<br>
+                    📦 {order['Devices']}<br>
+                    💰 {order['Total Offer']}
+                </div>
+                """, unsafe_allow_html=True)
+
+                st.markdown("**Physical Condition Check**")
+                new_condition = st.selectbox(
+                    "Actual Condition Found",
+                    list(CONDITION_MULTIPLIERS.keys()),
+                    key=f"cond_{order['Quote ID']}"
+                )
+                notes = st.text_area("Verification Notes", key=f"notes_{order['Quote ID']}", height=70)
+
+                if st.button("✅ Successfully Checked – Physical Verification Done",
+                             key=f"verify_{order['Quote ID']}", type="primary"):
+                    # Update order
+                    for o in st.session_state.quote_history:
+                        if o["Quote ID"] == order["Quote ID"]:
+                            o["Status"] = "Physical Verified – Ready for Payment"
+                            o["Physical Verified"] = True
+                            o["Verified By"] = st.session_state.delivery_name
+                            o["Verification Notes"] = notes
+                            o["Actual Condition"] = new_condition
+                            break
+                    st.success(f"Order {order['Quote ID']} marked as Physically Verified!")
+                    st.balloons()
+                    st.rerun()
+                st.markdown("---")
+
+    with tab2:
+        if not verified:
+            st.info("No orders waiting for payment.")
+        for order in verified:
+            st.markdown(f"""
+            <div class="order-card">
+                <b>{order['Quote ID']}</b><br>
+                👤 {order['Customer Name']} • 📞 {order['Phone']}<br>
+                💰 Pay: <b>{order['Total Offer']}</b><br>
+                Verified by: {order.get('Verified By')}
+            </div>
+            """, unsafe_allow_html=True)
+            if st.button(f"💵 Mark Payment Completed – {order['Quote ID']}", key=f"pay_{order['Quote ID']}"):
+                for o in st.session_state.quote_history:
+                    if o["Quote ID"] == order["Quote ID"]:
+                        o["Status"] = "Payment Completed"
+                        o["Payment Done"] = True
+                        break
+                st.success("Payment marked as completed!")
+                st.rerun()
+
+    with tab3:
+        st.markdown("### Registered Customers")
+        if not st.session_state.quote_history:
+            st.info("No customers yet.")
+        else:
+            customers = {}
+            for o in st.session_state.quote_history:
+                phone = o.get("Phone", "")
+                if phone not in customers:
+                    customers[phone] = {
+                        "Name": o.get("Customer Name"),
+                        "Phone": phone,
+                        "Email": o.get("Email"),
+                        "Orders": 0
+                    }
+                customers[phone]["Orders"] += 1
+
+            df = pd.DataFrame(customers.values())
+            st.dataframe(df, use_container_width=True, hide_index=True)
